@@ -1,0 +1,49 @@
+version: 0.2
+
+env:
+  variables:
+    CODEBUILD_BUILD_NUMBER: $CODEBUILD_BUILD_NUMBER
+    NEW_REVISION: $NEW_REVISION
+    IMAGE_URI: 585785618606.dkr.ecr.ap-south-1.amazonaws.com/nginx-demo
+  exported-variables:
+    - CODEBUILD_BUILD_NUMBER
+    - NEW_REVISION
+    - IMAGE_URI
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - $(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION)
+     #- $(aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 585785618606.dkr.ecr.ap-south-1.amazonaws.com)
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Building the Docker image...  
+      - echo Build Number $CODEBUILD_BUILD_NUMBER
+      - docker build -t nginx-demo:$CODEBUILD_BUILD_NUMBER .
+      - docker tag nginx-demo:$CODEBUILD_BUILD_NUMBER 585785618606.dkr.ecr.ap-south-1.amazonaws.com/nginx-demo:$CODEBUILD_BUILD_NUMBER
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker image...
+      - docker push 585785618606.dkr.ecr.ap-south-1.amazonaws.com/nginx-demo:$CODEBUILD_BUILD_NUMBER
+      - echo Update ECS Task definition
+      - ECR_IMAGE=585785618606.dkr.ecr.ap-south-1.amazonaws.com/nginx-demo:$CODEBUILD_BUILD_NUMBER
+      - TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition demo-nginx --region "$AWS_DEFAULT_REGION")
+      - NEW_TASK_DEFINTIION=$(echo $TASK_DEFINITION | jq --arg IMAGE "$ECR_IMAGE" '.taskDefinition | .containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) | del(.registeredBy) | del(.registeredAt)')
+      - NEW_TASK_INFO=$(aws ecs register-task-definition --region "$AWS_DEFAULT_REGION" --cli-input-json "$NEW_TASK_DEFINTIION")
+      - NEW_REVISION=$(echo $NEW_TASK_INFO | jq '.taskDefinition.revision')
+      - TASK_DEFINITION_ARN=$(echo $NEW_TASK_INFO | jq '.taskDefinition.taskDefinitionArn')
+      #- aws ecs update-service --cluster ${ECS_CLUSTER} --service ${SERVICE_NAME} --task-definition ${TASK_FAMILY}:${NEW_REVISION}
+      - echo TaskDefinition ARN is $TASK_DEFINITION_ARN
+      - cat appspec.json
+      - echo Updating AppSpec.json file 
+      - sed -i "s%IMAGEURI%$TASK_DEFINITION_ARN%g" appspec.json
+      - cat appspec.json
+
+
+
+artifacts:
+  files:
+    - appspec.json
