@@ -1,0 +1,31 @@
+version: 0.2
+
+env:
+  variables:
+    CODEBUILD_BUILD_NUMBER: $CODEBUILD_BUILD_NUMBER
+    
+  exported-variables:
+    - CODEBUILD_BUILD_NUMBER
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging into Amazon ECR....
+      - $(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION)
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo building the docker image...
+      - docker build -t specy-nginx:$CODEBUILD_BUILD_NUMBER .
+      - docker tag specy-nginx:$CODEBUILD_BUILD_NUMBER 585785618606.dkr.ecr.ap-south-1.amazonaws.com/specy:$CODEBUILD_BUILD_NUMBER
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo pushing the docker image....
+      - docker push 585785618606.dkr.ecr.ap-south-1.amazonaws.com/specy:$CODEBUILD_BUILD_NUMBER
+      - IMAGE_URI=585785618606.dkr.ecr.ap-south-1.amazonaws.com/specy:$CODEBUILD_BUILD_NUMBER
+      - printf [\{\"name\":\"specy-nginx\",\"imageUri\":\"$IMAGE_URI\"\}] > appspec.json
+
+artifacts:
+  files:
+    - appspec.json
