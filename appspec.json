@@ -1,18 +1,6 @@
-
-{
-  "version": 1,
-  "Resources": [
-    {
-      "TargetService": {
-        "Type": "AWS::ECS::Service",
-        "Properties": {
-          "TaskDefinition":IMAGEURI,
-          "LoadBalancerInfo": {
-            "ContainerName": "demo-nginx",
-            "ContainerPort": 80
-          }
-        }
-      }
-    }
-  ]
-}
+[
+   { 
+      "name": "specy-nginx",
+      "imageUri": "585785618606.dkr.ecr.ap-south-1.amazonaws.com/specy:nginx-image"
+   }
+]
